@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -105,7 +104,7 @@
   .search-bar input {
     width: 100%; background: var(--surface); border: 1px solid var(--border);
     border-radius: 12px; padding: 13px 16px 13px 40px; color: var(--text);
-    font-family: 'DM Sans', sans-serif; font-size: 16px; /* 16px prevents iOS zoom */
+    font-family: 'DM Sans', sans-serif; font-size: 16px;
     outline: none; transition: border-color 0.2s; -webkit-appearance: none;
   }
   .search-bar input:focus { border-color: var(--green); box-shadow: 0 0 0 3px var(--green-glow); }
@@ -139,7 +138,6 @@
   .msg-time { font-size: 10px; color: var(--text-faint); margin-top: 3px; padding: 0 4px; }
   .highlight { background: rgba(255,220,0,0.25); border-radius: 3px; padding: 0 1px; }
 
-  /* MEDIA — fluid widths on mobile */
   .media-img-wrap {
     border-radius: 14px; overflow: hidden; cursor: zoom-in;
     display: block; max-width: min(260px, 70vw);
@@ -201,7 +199,6 @@
   }
   .media-caption { padding: 5px 8px 2px; font-size: 13px; line-height: 1.4; }
 
-  /* Lightbox */
   #lightbox {
     display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.95);
     z-index: 9999; align-items: center; justify-content: center; cursor: zoom-out;
@@ -217,7 +214,6 @@
   }
   #lb-close:active { opacity: 1; }
 
-  /* Progress */
   #progress-bar { display: none; position: fixed; top: 0; left: 0; right: 0; height: 3px; background: var(--surface2); z-index: 9000; }
   #progress-fill { height: 100%; background: var(--green); width: 0%; transition: width 0.15s; box-shadow: 0 0 8px var(--green); }
 
@@ -243,7 +239,6 @@
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
   .error-msg { color: #f85149; font-size: 13px; margin-top: 10px; text-align: center; }
 
-  /* ── Mobile overrides ── */
   @media (max-width: 480px) {
     header { padding: 24px 14px 16px; }
     h1 { font-size: 18px; }
@@ -278,7 +273,7 @@
     </div>
     <h1>WhatsApp Viewer</h1>
   </div>
-  <p class="subtitle">Visualiza tus chats exportados — sin backend, sin servidores, 100% privado</p>
+  <p class="subtitle">Visualiza tus chats exportados — sin servidores, 100% privado, 100% local</p>
 </header>
 
 <div id="dropzone">
@@ -310,7 +305,7 @@ let displayedCount = 0;
 const PAGE_SIZE = 60;
 let searchQuery = '';
 const mediaURLs = {};
-// Case-insensitive media URL lookup
+
 function getMedia(filename) {
   if (!filename) return null;
   if (mediaURLs[filename]) return mediaURLs[filename];
@@ -319,7 +314,6 @@ function getMedia(filename) {
   return key ? mediaURLs[key] : null;
 }
 
-// Drag & drop setup
 const dropArea = document.getElementById('dropArea');
 dropArea.addEventListener('dragover', e => { e.preventDefault(); dropArea.classList.add('over'); });
 dropArea.addEventListener('dragleave', () => dropArea.classList.remove('over'));
@@ -351,7 +345,6 @@ async function processFile(file) {
       if (!entry.dir) {
         const name = path.split('/').pop();
         if (name.match(/\.txt$/i)) {
-          // Prioritize: _chat.txt > anything with "chat" > any .txt
           if (!chatFile) chatFile = path;
           else if (name.match(/chat/i) && !chatFile.match(/chat/i)) chatFile = path;
           else if (name.match(/^_?chat\.txt$/i)) chatFile = path;
@@ -361,11 +354,9 @@ async function processFile(file) {
     if (!chatFile) { err.textContent = '⚠️ No se encontró el archivo de chat en el .zip.'; setProgress(100); return; }
     setProgress(25);
 
-    // Revoke old URLs and clear in-place (don't reassign — getMedia holds the reference)
     Object.values(mediaURLs).forEach(u => URL.revokeObjectURL(u));
     Object.keys(mediaURLs).forEach(k => delete mediaURLs[k]);
 
-    // Load all media files
     for (let i = 0; i < mediaEntries.length; i++) {
       const { entry, name } = mediaEntries[i];
       try {
@@ -396,22 +387,16 @@ function guessMime(name) {
     docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }[e] || null;
 }
 
-// WhatsApp media patterns (ES + EN)
-// Strips all invisible Unicode chars before matching
 function stripInvis(s) {
   return s.replace(/[\u200e\u200f\u202a-\u202f\u2060\ufeff]/g, '').trim();
 }
 
-// Extracts filename from <adjunto: X> or <attached: X> tags
 function extractAdjunto(s) {
   const clean = stripInvis(s);
-  // Match <adjunto: filename> or <attached: filename>
   const m = clean.match(/<(?:adjunto|attached):\s*(.+?)>/i);
   if (m) return m[1].trim();
-  // Match (archivo adjunto) or (file attached)
   const m2 = clean.match(/^(.+?)\s*\((?:archivo adjunto|file attached)\)$/i);
   if (m2) return m2[1].trim();
-  // Match <omitted>
   const m3 = clean.match(/^(.+?)\s*<omitted>$/i);
   if (m3) return m3[1].trim();
   return null;
@@ -430,28 +415,21 @@ function detectMedia(text) {
   const t = text.trim();
   const tClean = stripInvis(t);
 
-  // Check omitted patterns first
   for (const { r, type } of OMIT_PATS) {
     if (r.test(tClean)) return { omitted: true, type };
   }
 
-  // WhatsApp puts <adjunto:> anywhere in the message
-  // Scan all lines for one containing <adjunto: X> or <attached: X>
   const lines = t.split('\n');
   for (let li = 0; li < lines.length; li++) {
     const lineClean = stripInvis(lines[li]);
     const filename = extractAdjunto(lineClean);
     if (filename) {
-      // Caption = ONLY text on the same line before the tag (inline caption)
-      // Lines on other rows are separate text in the same message bubble — handled below
       const beforeTag = lineClean.replace(/<(?:adjunto|attached):\s*.+?>/i, '').replace(/\((?:archivo adjunto|file attached)\)/i,'').trim();
-      // Also collect any other lines as extra text (shown as bubble below media)
       const otherLines = lines.filter((_, i) => i !== li).map(l => stripInvis(l)).filter(Boolean).join('\n').trim();
       return { filename, caption: beforeTag, extraText: otherLines };
     }
   }
 
-  // Bare filename on first line that exists in mediaURLs (fallback)
   const firstClean = stripInvis(lines[0]);
   const bare = firstClean.match(/^([\w\-\. ]+\.(jpg|jpeg|png|gif|webp|heic|mp4|mov|avi|mkv|webm|mp3|ogg|oga|opus|m4a|aac|wav|pdf|doc|docx|xls|xlsx|xlsm|ppt|pptx))$/i);
   if (bare && getMedia(bare[1])) {
@@ -487,6 +465,8 @@ function buildMediaEl(ref) {
   if (ref.omitted) {
     const icons = { image:'🖼️', audio:'🎵', video:'🎬', sticker:'🎭', document:'📎' };
     const labels = { image:'Imagen no exportada', audio:'Audio no exportado', video:'Video no exportado', sticker:'Sticker no exportado', document:'Archivo no exportado' };
+    // For omitted stickers, show nothing (no placeholder text)
+    if (ref.type === 'sticker') return [];
     const t = ref.type || 'document';
     const el = document.createElement('div');
     el.className = 'media-missing';
@@ -498,14 +478,18 @@ function buildMediaEl(ref) {
   const url = getMedia(filename);
   const els = [];
 
-  if (!url) {
-    const el = document.createElement('div');
-    el.className = 'media-missing';
-    el.textContent = '📎 ' + filename;
-    els.push(el);
-  } else {
-    const mt = mediaType(filename);
+  // Determine type before url check so we can suppress sticker filename
+  const mt = mediaType(filename);
 
+  if (!url) {
+    // For stickers, silently skip — no filename text shown
+    if (mt !== 'sticker') {
+      const el = document.createElement('div');
+      el.className = 'media-missing';
+      el.textContent = '📎 ' + filename;
+      els.push(el);
+    }
+  } else {
     if (mt === 'sticker') {
       const wrap = document.createElement('div');
       wrap.className = 'sticker-wrap';
@@ -546,7 +530,6 @@ function buildMediaEl(ref) {
         <span class="audio-dur" id="${uid}_dur">0:00</span>
         <audio id="${uid}_aud" preload="metadata" src="${url}"></audio>
       `;
-      // Setup duration on load
       setTimeout(() => {
         const aud = document.getElementById(uid + '_aud');
         if (aud) aud.addEventListener('loadedmetadata', () => {
@@ -572,7 +555,8 @@ function buildMediaEl(ref) {
     }
   }
 
-  if (caption) {
+  // Show caption only for non-sticker media
+  if (caption && mt !== 'sticker') {
     const cap = document.createElement('div');
     cap.className = 'media-caption';
     cap.innerHTML = formatText(caption, searchQuery);
@@ -646,9 +630,7 @@ function closeLightbox() {
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLightbox(); });
 
 function parseChat(text) {
-  // iOS:     [DD/MM/YY, H:MM:SS p.m.] Sender: message
   const reIOS = /^\[(\d{1,2}\/\d{1,2}\/\d{2,4}),\s*(\d{1,2}:\d{2}(?::\d{2})?(?:[\s\u202f]*[ap]\.?[\s\u202f]*m\.?)?)\]\s*([^:]+?):\s*([\s\S]*)$/i;
-  // Android: DD/MM/YY H:MM p. m. - Sender: message
   const reAndroid = /^(\d{1,2}\/\d{1,2}\/\d{2,4})\s+(\d{1,2}:\d{2}(?::\d{2})?(?:[\s\u202f]*[ap]\.?[\s\u202f]*m\.?)?)\s*-\s*([^:]+?):\s*([\s\S]*)$/i;
 
   const invis = /[\u200e\u200f\u202a-\u202e\u2060\ufeff]/g;
@@ -683,8 +665,6 @@ function parseAndRender(text, filename, mediaCount, chatTxtName) {
   const senders = {};
   allMessages.forEach(m => { senders[m.sender] = (senders[m.sender]||0)+1; });
 
-  // Try to get chat name from the txt filename (Android: 'Chat de WhatsApp con Alejandro.txt')
-  // or from the zip filename (iOS: 'WhatsApp_Chat_-_Name.zip')
   let chatName = chatTxtName
     ? chatTxtName.replace(/\.txt$/i,'').replace(/^(Chat de WhatsApp con|WhatsApp Chat with)\s*/i,'').trim()
     : filename.replace('WhatsApp_Chat_-_','').replace('.zip','').replace(/_/g,' ').trim();
@@ -722,15 +702,12 @@ function parseAndRender(text, filename, mediaCount, chatTxtName) {
 
 function detectSelf(senders) {
   const keys = Object.keys(senders);
-  // Exclude system-like senders
   const real = keys.filter(k => !k.includes('cifrad') && k !== 'Sistema' &&
     !/^(Los mensajes|Messages)/i.test(k));
   if (real.length === 0) return null;
   if (real.length === 1) return real[0];
-  // iOS: self has no ~ prefix; pick least-sent as fallback (heuristic)
   const noTilde = real.filter(k => !k.startsWith('~'));
   if (noTilde.length === 1) return noTilde[0];
-  // Fallback: sender with fewest messages (usually the phone owner in 2-person chats)
   return real.sort((a,b) => senders[a] - senders[b])[0];
 }
 
@@ -812,11 +789,11 @@ function renderMessages(append) {
     const before = container.scrollHeight;
     container.insertBefore(frag, container.firstChild);
     window.scrollBy(0, container.scrollHeight - before);
-  observeMessages();
+    observeMessages();
   } else {
     container.appendChild(frag);
     window.scrollTo(0, document.body.scrollHeight);
-  observeMessages();
+    observeMessages();
   }
 
   const wrap = document.getElementById('loadMoreWrap');
@@ -835,7 +812,6 @@ function filterMessages() {
   renderMessages(false);
 }
 
-// ── Scroll fade-in observer ──────────────────────────────────────────────
 const fadeObserver = new IntersectionObserver((entries) => {
   entries.forEach(e => {
     if (e.isIntersecting) {
@@ -849,7 +825,6 @@ function observeMessages() {
   document.querySelectorAll('.msg-row:not(.visible)').forEach(el => fadeObserver.observe(el));
 }
 
-// ── Subtle parallax on header logo ───────────────────────────────────────
 window.addEventListener('scroll', () => {
   const logo = document.querySelector('.logo-icon');
   if (logo) {
