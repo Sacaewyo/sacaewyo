@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -10,6 +9,9 @@
 <title>Ventas · Xochicalco</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Sora:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.js"></script>
 <style>
 :root{--bg:#0d0d0d;--surface:#181818;--card:#1f1f1f;--border:#2a2a2a;--border2:#333;--accent:#c8f135;--accent2:#9bc41a;--red:#ff4f4f;--amber:#ffb830;--blue:#4f9eff;--purple:#b57fff;--text:#f0f0f0;--muted:#666;--muted2:#444;--sans:'Sora',sans-serif;--mono:'DM Mono',monospace;--r:14px;--r-sm:8px}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -22,6 +24,9 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .save-pill.saved{color:var(--accent);border-color:var(--accent2)}
 .save-dot{width:6px;height:6px;border-radius:50%;background:var(--muted);transition:background .3s}
 .save-pill.saved .save-dot{background:var(--accent)}
+.terminal-pill{display:flex;align-items:center;font-size:11px;font-family:var(--mono);font-weight:600;background:var(--surface);border:1px solid var(--border2);border-radius:20px;padding:4px 10px;cursor:pointer;transition:all .2s;color:var(--muted);user-select:none}
+.terminal-pill.t1{border-color:#4f9eff55;color:var(--blue)}
+.terminal-pill.t2{border-color:#b57fff55;color:var(--purple)}
 .tabs{display:grid;grid-template-columns:repeat(3,1fr);background:var(--surface);border-bottom:1px solid var(--border)}
 .tab{padding:.7rem .5rem;text-align:center;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;letter-spacing:.03em;text-transform:uppercase}
 .tab.active{color:var(--accent);border-bottom-color:var(--accent)}
@@ -142,12 +147,38 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .toast{position:fixed;bottom:5.5rem;left:50%;transform:translateX(-50%) translateY(10px);background:var(--accent);color:#0d0d0d;font-family:var(--mono);font-size:12px;font-weight:500;padding:7px 16px;border-radius:20px;opacity:0;transition:all .3s;pointer-events:none;white-space:nowrap;z-index:500}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .toast.error{background:var(--red);color:#fff}
+/* ── QR SYNC ── */
+.sync-bar{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:1.5rem}
+.btn-sync{padding:.75rem;border-radius:var(--r-sm);font-family:var(--sans);font-size:13px;font-weight:600;cursor:pointer;text-align:center;border:1px solid var(--border2);background:var(--card);color:var(--text);display:flex;align-items:center;justify-content:center;gap:6px}
+.btn-sync.export{border-color:var(--accent2);color:var(--accent)}
+.btn-sync.import{border-color:var(--blue);color:var(--blue)}
+.btn-sync:active{transform:scale(.97)}
+.qr-box{background:#fff;border-radius:var(--r-sm);padding:16px;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;width:fit-content}
+.qr-meta{font-size:11px;font-family:var(--mono);color:var(--muted);text-align:center;margin-bottom:1rem}
+.qr-meta span{color:var(--accent)}
+.scan-wrap{position:relative;border-radius:var(--r);overflow:hidden;background:#000;aspect-ratio:1;margin-bottom:1rem}
+.scan-video{width:100%;height:100%;object-fit:cover;display:block}
+.scan-frame{position:absolute;inset:15%;border:2px solid var(--accent);border-radius:8px;box-shadow:0 0 0 9999px rgba(0,0,0,.5)}
+.scan-status{font-size:12px;font-family:var(--mono);color:var(--muted);text-align:center;margin-bottom:1rem}
+.scan-status.found{color:var(--accent)}
+canvas#scan-canvas{display:none}
+.merge-result{background:var(--card);border:1px solid var(--accent2);border-radius:var(--r-sm);padding:.75rem 1rem;margin-bottom:1rem;display:none}
+.merge-result-title{font-size:12px;font-weight:700;color:var(--accent);margin-bottom:.4rem;font-family:var(--mono)}
+.merge-result-row{font-size:12px;color:var(--muted);font-family:var(--mono)}
 </style>
 </head>
 <body>
 <div class="topbar">
-  <div><div class="topbar-title">Xochicalco</div><div class="topbar-sub">Campus Mexicali</div></div>
-  <div class="save-pill saved" id="save-pill"><div class="save-dot"></div><span id="save-label">Guardado</span></div>
+  <div>
+    <div class="topbar-title">Xochicalco</div>
+    <div class="topbar-sub">Campus Mexicali</div>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <div class="terminal-pill" id="terminal-pill" onclick="cycleTerminal()" title="Toca para cambiar terminal">
+      <span id="terminal-label">T-?</span>
+    </div>
+    <div class="save-pill saved" id="save-pill"><div class="save-dot"></div><span id="save-label">Guardado</span></div>
+  </div>
 </div>
 <div class="tabs">
   <div class="tab active" onclick="switchTab('ventas')">Venta</div>
@@ -156,7 +187,6 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 </div>
 
 <!-- VENTAS -->
-
 <div class="section active" id="tab-ventas">
   <div class="metrics">
     <div class="metric accent"><div class="metric-label">Total del día</div><div class="metric-val" id="v-total">$0</div></div>
@@ -177,7 +207,6 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 </div>
 
 <!-- INVENTARIO -->
-
 <div class="section" id="tab-inventario">
   <div class="section-label">Inventario inicial y mermas</div>
   <div class="inv-card">
@@ -188,13 +217,21 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 </div>
 
 <!-- RESUMEN -->
-
 <div class="section" id="tab-resumen">
   <div class="section-label">Totales generales</div>
   <div class="metrics metrics-3" style="margin-bottom:1rem">
     <div class="metric accent"><div class="metric-label">Ventas $</div><div class="metric-val sm" id="r-total">$0</div></div>
     <div class="metric"><div class="metric-label">Transac.</div><div class="metric-val sm" id="r-count">0</div></div>
     <div class="metric"><div class="metric-label">Mermas</div><div class="metric-val sm" id="r-merma">0</div></div>
+  </div>
+  <div class="section-label">Sincronización entre terminales</div>
+  <div class="sync-bar">
+    <button class="btn-sync export" onclick="openQRExport()">📤 Generar QR</button>
+    <button class="btn-sync import" onclick="openQRScan()">📷 Escanear QR</button>
+  </div>
+  <div class="merge-result" id="merge-result">
+    <div class="merge-result-title">✓ Fusión completada</div>
+    <div class="merge-result-row" id="merge-result-info"></div>
   </div>
   <div class="section-label">Por producto</div>
   <div id="summary-rows"></div>
@@ -210,7 +247,6 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 </div>
 
 <!-- PAYMENT MODAL -->
-
 <div class="modal-overlay" id="pay-overlay">
   <div class="modal">
     <div class="modal-handle"></div>
@@ -218,48 +254,44 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
     <div class="modal-sub" id="pay-sub">Selecciona el método de pago</div>
     <div class="cart-preview" id="pay-cart-preview"></div>
 
-```
-<!-- Advertencia de inventario en modal -->
-<div class="pay-warn" id="pay-warn"></div>
+    <!-- Advertencia de inventario en modal -->
+    <div class="pay-warn" id="pay-warn"></div>
 
-<!-- 3 métodos: Efectivo, Débito, Crédito -->
-<div class="pay-methods">
-  <button class="pay-method" id="pm-efectivo" onclick="selectMethod('efectivo')">💵 Efectivo</button>
-  <button class="pay-method" id="pm-debito"   onclick="selectMethod('debito')">💳 Débito</button>
-  <button class="pay-method" id="pm-credito"  onclick="selectMethod('credito')">💎 Crédito</button>
-</div>
+    <!-- 3 métodos: Efectivo, Débito, Crédito -->
+    <div class="pay-methods">
+      <button class="pay-method" id="pm-efectivo" onclick="selectMethod('efectivo')">💵 Efectivo</button>
+      <button class="pay-method" id="pm-debito"   onclick="selectMethod('debito')">💳 Débito</button>
+      <button class="pay-method" id="pm-credito"  onclick="selectMethod('credito')">💳 Crédito</button>
+    </div>
 
-<!-- Efectivo: monto recibido + cambio -->
-<div id="single-amount-row" style="display:none;margin-bottom:1rem">
-  <div class="field-label" style="margin-bottom:4px">Monto recibido</div>
-  <input class="amount-input" id="single-amount" type="number" inputmode="decimal" placeholder="0.00" oninput="updateChange()">
-</div>
+    <!-- Efectivo: monto recibido + cambio -->
+    <div id="single-amount-row" style="display:none;margin-bottom:1rem">
+      <div class="field-label" style="margin-bottom:4px">Monto recibido</div>
+      <input class="amount-input" id="single-amount" type="number" inputmode="decimal" placeholder="0.00" oninput="updateChange()">
+    </div>
 
-<!-- Débito / Crédito: monto exacto automático -->
-<div id="card-amount-row" style="display:none">
-  <div class="card-pay-info" id="card-pay-info">
-    <div class="card-label">Total a cobrar</div>
-    <div class="card-amount" id="card-amount-val">$0.00</div>
-    <div class="card-note">El pago con tarjeta cubre el total exacto</div>
-  </div>
-</div>
+    <!-- Débito / Crédito: monto exacto automático -->
+    <div id="card-amount-row" style="display:none">
+      <div class="card-pay-info" id="card-pay-info">
+        <div class="card-label">Total a cobrar</div>
+        <div class="card-amount" id="card-amount-val">$0.00</div>
+        <div class="card-note">El pago con tarjeta cubre el total exacto</div>
+      </div>
+    </div>
 
-<div class="change-row" id="change-row" style="display:none">
-  <span class="change-label">Cambio</span>
-  <span class="change-val" id="change-val">$0.00</span>
-</div>
+    <div class="change-row" id="change-row" style="display:none">
+      <span class="change-label">Cambio</span>
+      <span class="change-val" id="change-val">$0.00</span>
+    </div>
 
-<div class="modal-btns">
-  <button class="btn-cancel" onclick="closePayment()">Cancelar</button>
-  <button class="btn-confirm" id="btn-confirm" onclick="confirmSale()" disabled>Confirmar venta</button>
-</div>
-```
-
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closePayment()">Cancelar</button>
+      <button class="btn-confirm" id="btn-confirm" onclick="confirmSale()" disabled>Confirmar venta</button>
+    </div>
   </div>
 </div>
 
 <!-- RESET MODAL -->
-
 <div class="modal-overlay" id="reset-overlay">
   <div class="modal">
     <div class="modal-handle"></div>
@@ -272,14 +304,65 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
   </div>
 </div>
 
+<!-- QR EXPORT MODAL -->
+<div class="modal-overlay" id="qr-overlay">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Exportar estado</div>
+    <div class="modal-sub">Escanea este QR desde la otra terminal para fusionar las ventas</div>
+    <div class="qr-box" id="qr-container"></div>
+    <div class="qr-meta" id="qr-meta">Generando…</div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeQRExport()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- QR SCAN MODAL -->
+<div class="modal-overlay" id="scan-overlay">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Importar desde QR</div>
+    <div class="modal-sub">Apunta la cámara al QR de la otra terminal</div>
+    <div class="scan-wrap">
+      <video class="scan-video" id="scan-video" autoplay playsinline muted></video>
+      <div class="scan-frame"></div>
+    </div>
+    <canvas id="scan-canvas"></canvas>
+    <div class="scan-status" id="scan-status">Buscando QR…</div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeQRScan()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
+// ─── TERMINAL ID ─────────────────────────────────────────────────────────────
+const TERMINAL_KEY='xochicalco_terminal';
+function getTerminalId(){return localStorage.getItem(TERMINAL_KEY)||'T-1';}
+function setTerminalId(id){
+  localStorage.setItem(TERMINAL_KEY,id);
+  renderTerminalPill();
+}
+function renderTerminalPill(){
+  const id=getTerminalId();
+  const pill=document.getElementById('terminal-pill');
+  document.getElementById('terminal-label').textContent=id;
+  pill.className='terminal-pill '+(id==='T-1'?'t1':'t2');
+}
+function cycleTerminal(){
+  const cur=getTerminalId();
+  const next=cur==='T-1'?'T-2':'T-1';
+  if(confirm('Cambiar esta terminal a '+next+'?')){setTerminalId(next);}
+}
+
 const PRODUCTS=[
   {id:'agua',    name:'Agua',              price:45,  color:'#378ADD'},
   {id:'soda',    name:'Soda',              price:60,  color:'#D85A30'},
   {id:'pizza_r', name:'Rebanada de pizza', price:40,  color:'#E24B4A'},
-  {id:'charola', name:'Charola (pizza)',   price:650, color:'#1D9E75'},
+  {id:'charola', name:'Charola',   price:650, color:'#1D9E75'},
   {id:'frituras',name:'Frituras',          price:40,  color:'#BA7517'},
 ];
 const KEY='xochicalco_v2';
@@ -612,7 +695,7 @@ function openReset(){document.getElementById('reset-overlay').classList.add('ope
 function closeReset(){document.getElementById('reset-overlay').classList.remove('open');}
 function resetDay(){
   state.sales=[];cart={};PRODUCTS.forEach(p=>{state.mermas[p.id]=0;});
-  closeReset();render();renderInventory();autoSave();showToast('Día reiniciado');
+  closeReset();render();renderInventory();renderTerminalPill();autoSave();showToast('Día reiniciado');
 }
 
 function exportCSV(){
@@ -636,11 +719,165 @@ function showToast(msg,type=''){
   toastTimer=setTimeout(()=>t.classList.remove('show'),2800);
 }
 
+// ─── QR SYNC ─────────────────────────────────────────────────────────────────
+
+// Comprimir state → base64 usando pako deflate
+function stateToB64(){
+  const exportData={...state, terminalId:getTerminalId()};
+  const json=JSON.stringify(exportData);
+  const compressed=pako.deflate(json,{level:9});
+  let binary='';
+  compressed.forEach(b=>binary+=String.fromCharCode(b));
+  return btoa(binary);
+}
+
+// Descomprimir base64 → state object
+function b64ToState(b64){
+  const binary=atob(b64);
+  const bytes=new Uint8Array(binary.length);
+  for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+  return JSON.parse(pako.inflate(bytes,{to:'string'}));
+}
+
+function openQRExport(){
+  // Limpiar QR anterior
+  const container=document.getElementById('qr-container');
+  container.innerHTML='';
+  document.getElementById('qr-meta').textContent='Generando…';
+  document.getElementById('qr-overlay').classList.add('open');
+
+  setTimeout(()=>{
+    try{
+      const b64=stateToB64();
+      if(b64.length>2900){
+        document.getElementById('qr-meta').innerHTML=
+          '⚠️ Datos demasiado grandes para QR (<span>'+b64.length+' chars</span>). Usa Exportar CSV.';
+        return;
+      }
+      new QRCode(container,{text:b64,width:240,height:240,colorDark:'#000',colorLight:'#fff',correctLevel:QRCode.CorrectLevel.M});
+      const sales=state.sales.length;
+      document.getElementById('qr-meta').innerHTML=
+        '<span>'+sales+'</span> venta'+(sales!==1?'s':'')+' · '+fmt(state.sales.reduce((a,s)=>a+s.total,0))+
+        ' · <span>'+b64.length+' chars</span>';
+    }catch(e){
+      document.getElementById('qr-meta').textContent='Error al generar QR: '+e.message;
+    }
+  },80);
+}
+
+function closeQRExport(){document.getElementById('qr-overlay').classList.remove('open');}
+
+// ─── SCANNER ─────────────────────────────────────────────────────────────────
+let scanStream=null,scanAnimFrame=null,scanDone=false;
+
+async function openQRScan(){
+  scanDone=false;
+  document.getElementById('scan-status').textContent='Iniciando cámara…';
+  document.getElementById('scan-status').className='scan-status';
+  document.getElementById('scan-overlay').classList.add('open');
+  try{
+    scanStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    const video=document.getElementById('scan-video');
+    video.srcObject=scanStream;
+    await video.play();
+    scanLoop();
+  }catch(e){
+    document.getElementById('scan-status').textContent='No se pudo acceder a la cámara: '+e.message;
+  }
+}
+
+function scanLoop(){
+  if(scanDone)return;
+  const video=document.getElementById('scan-video');
+  const canvas=document.getElementById('scan-canvas');
+  const ctx=canvas.getContext('2d');
+  if(video.readyState===video.HAVE_ENOUGH_DATA){
+    canvas.width=video.videoWidth;
+    canvas.height=video.videoHeight;
+    ctx.drawImage(video,0,0);
+    const imageData=ctx.getImageData(0,0,canvas.width,canvas.height);
+    const code=jsQR(imageData.data,imageData.width,imageData.height,{inversionAttempts:'dontInvert'});
+    if(code){
+      scanDone=true;
+      document.getElementById('scan-status').textContent='✓ QR detectado — procesando…';
+      document.getElementById('scan-status').className='scan-status found';
+      stopCamera();
+      setTimeout(()=>{
+        closeQRScan();
+        try{
+          const imported=b64ToState(code.data);
+          mergeStates(imported);
+        }catch(e){
+          showToast('QR inválido o de otra app','error');
+        }
+      },400);
+      return;
+    }
+    document.getElementById('scan-status').textContent='Buscando QR…';
+  }
+  scanAnimFrame=requestAnimationFrame(scanLoop);
+}
+
+function stopCamera(){
+  if(scanStream){scanStream.getTracks().forEach(t=>t.stop());scanStream=null;}
+  cancelAnimationFrame(scanAnimFrame);
+}
+function closeQRScan(){stopCamera();document.getElementById('scan-overlay').classList.remove('open');}
+
+// ─── MERGE DE ESTADOS ─────────────────────────────────────────────────────────
+// Lógica: ambas terminales parten del MISMO inventario inicial.
+// Al fusionar: ventas se combinan, mermas se suman.
+// El inventario disponible final se calcula automáticamente:
+//   disponible = inventario_inicial - totalVentas - totalMermas
+function mergeStates(imported){
+  // Ventas: combinar y deduplicar por id
+  const existingIds=new Set(state.sales.map(s=>s.id));
+  const newSales=imported.sales.filter(s=>!existingIds.has(s.id));
+
+  if(newSales.length===0){
+    showToast('No hay ventas nuevas para fusionar — ya estás al día');
+    return;
+  }
+
+  state.sales=[...state.sales,...newSales].sort((a,b)=>a.id-b.id);
+
+  // Mermas: sumar las de ambas terminales
+  PRODUCTS.forEach(p=>{
+    state.mermas[p.id]=(state.mermas[p.id]||0)+(imported.mermas[p.id]||0);
+  });
+
+  // Inventario: NO se modifica — ambas terminales parten del mismo valor inicial.
+  // El disponible final se recalcula solo con: inv - ventas_combinadas - mermas_combinadas.
+
+  render();renderSummary();renderInventory();autoSave();
+
+  // Mostrar resultado con inventario final por producto
+  const newTotal=newSales.reduce((a,s)=>a+s.total,0);
+  const fromTerminal=imported.terminalId||'otra terminal';
+  let lines=[];
+  lines.push('Importado desde '+fromTerminal+' · +'+newSales.length+' venta'+(newSales.length!==1?'s':'')+' · '+fmt(newTotal)+' adicional');
+  lines.push('Total combinado: '+fmt(state.sales.reduce((a,s)=>a+s.total,0)));
+  lines.push('');
+  lines.push('Inventario final:');
+  PRODUCTS.forEach(p=>{
+    const inv=state.inventory[p.id]||0;
+    if(inv===0)return;
+    const avail=getAvail(p.id);
+    lines.push('  '+p.name+': '+avail+' restante'+(avail!==1?'s':'')+' de '+inv);
+  });
+  document.getElementById('merge-result-info').innerHTML=lines.map(l=>l?'<div>'+l+'</div>':'<div style=margin-top:4px></div>').join('');
+  document.getElementById('merge-result').style.display='block';
+  showToast('+'+newSales.length+' ventas de '+fromTerminal+' fusionadas');
+  switchTab('resumen');
+}
+
+document.getElementById('qr-overlay').addEventListener('click',function(e){if(e.target===this)closeQRExport();});
+document.getElementById('scan-overlay').addEventListener('click',function(e){if(e.target===this)closeQRScan();});
+
 document.getElementById('pay-overlay').addEventListener('click',function(e){if(e.target===this)closePayment();});
 document.getElementById('reset-overlay').addEventListener('click',function(e){if(e.target===this)closeReset();});
 
 render();renderInventory();
 </script>
-
 </body>
 </html>
